@@ -92,7 +92,7 @@ def webhook():
     return 'Bad Request', 400
 
 # ==========================================
-# PAYMENT SYSTEM CLASSES
+# PAYMENT SYSTEM CLASSES WITHOUT AIOHTTP
 # ==========================================
 
 class PaymentSystem:
@@ -139,7 +139,7 @@ class PaymentSystem:
     # ==========================================
     # BKASH PAYMENT METHODS
     # ==========================================
-    def send_payment_bkash(self, amount, recipient_number, reference=""):
+    async def send_payment_bkash(self, amount, recipient_number, reference=""):
         """
         Send payment via Bkash API
         Returns: (success, message, transaction_id)
@@ -151,7 +151,7 @@ class PaymentSystem:
             # Generate unique transaction ID
             transaction_id = f"BKASH{int(time.time())}{random.randint(1000, 9999)}"
             
-            # Create request payload (This is example - adjust based on actual API)
+            # Create request payload
             payload = {
                 "api_key": self.bkash_api_key,
                 "api_secret": self.bkash_api_secret,
@@ -161,31 +161,16 @@ class PaymentSystem:
                 "transaction_id": transaction_id
             }
             
-            # Example API call (Replace with actual Bkash API endpoint)
-            # response = requests.post("https://api.bkash.com/payment/send", 
-            #                         json=payload, 
-            #                         headers={"Content-Type": "application/json"})
-            
-            # For now, simulate successful payment
             logging.info(f"📱 Bkash Payment: {amount} TK to {recipient_number}")
             
             # Simulate API delay
-            time.sleep(1)
+            await asyncio.sleep(1)
             
-            # Check if this is a test (using test credentials)
+            # Check if this is a test
             if self.bkash_api_key.startswith("test_"):
-                # Test mode - always success
                 return True, "✅ Payment sent successfully (Test Mode)", transaction_id
             else:
-                # Real API would check response here
-                # if response.status_code == 200:
-                #     data = response.json()
-                #     if data.get("status") == "success":
-                #         return True, "✅ Payment sent successfully", transaction_id
-                #     else:
-                #         return False, f"❌ Payment failed: {data.get('message', 'Unknown error')}", None
-                
-                # For now, simulate 90% success rate
+                # Simulate success rate
                 if random.random() < 0.9:
                     return True, "✅ Payment sent successfully", transaction_id
                 else:
@@ -198,7 +183,7 @@ class PaymentSystem:
     # ==========================================
     # NAGAD PAYMENT METHODS
     # ==========================================
-    def send_payment_nagad(self, amount, recipient_number, reference=""):
+    async def send_payment_nagad(self, amount, recipient_number, reference=""):
         """
         Send payment via Nagad API
         Returns: (success, message, transaction_id)
@@ -209,10 +194,9 @@ class PaymentSystem:
         try:
             transaction_id = f"NAGAD{int(time.time())}{random.randint(1000, 9999)}"
             
-            # Nagad API call would go here
             logging.info(f"📱 Nagad Payment: {amount} TK to {recipient_number}")
             
-            time.sleep(1)
+            await asyncio.sleep(1)
             
             if self.nagad_api_key.startswith("test_"):
                 return True, "✅ Payment sent successfully (Test Mode)", transaction_id
@@ -229,7 +213,7 @@ class PaymentSystem:
     # ==========================================
     # ROCKET PAYMENT METHODS
     # ==========================================
-    def send_payment_rocket(self, amount, recipient_number, reference=""):
+    async def send_payment_rocket(self, amount, recipient_number, reference=""):
         """
         Send payment via Rocket API
         Returns: (success, message, transaction_id)
@@ -240,10 +224,9 @@ class PaymentSystem:
         try:
             transaction_id = f"ROCKET{int(time.time())}{random.randint(1000, 9999)}"
             
-            # Rocket API call would go here
             logging.info(f"📱 Rocket Payment: {amount} TK to {recipient_number}")
             
-            time.sleep(1)
+            await asyncio.sleep(1)
             
             if self.rocket_api_key.startswith("test_"):
                 return True, "✅ Payment sent successfully (Test Mode)", transaction_id
@@ -260,7 +243,7 @@ class PaymentSystem:
     # ==========================================
     # UNIFIED PAYMENT METHOD
     # ==========================================
-    def send_payment(self, amount, recipient_number, method, reference=""):
+    async def send_payment(self, amount, recipient_number, method, reference=""):
         """
         Unified payment method - calls appropriate API based on method
         Returns: (success, message, transaction_id)
@@ -268,11 +251,11 @@ class PaymentSystem:
         method = method.lower()
         
         if method == "bkash":
-            return self.send_payment_bkash(amount, recipient_number, reference)
+            return await self.send_payment_bkash(amount, recipient_number, reference)
         elif method == "nagad":
-            return self.send_payment_nagad(amount, recipient_number, reference)
+            return await self.send_payment_nagad(amount, recipient_number, reference)
         elif method == "rocket":
-            return self.send_payment_rocket(amount, recipient_number, reference)
+            return await self.send_payment_rocket(amount, recipient_number, reference)
         else:
             return False, "❌ Invalid payment method", None
     
@@ -323,7 +306,7 @@ class PaymentSystem:
     # ==========================================
     # TEST PAYMENT (For admin testing)
     # ==========================================
-    def test_payment(self, method, amount=10):
+    async def test_payment(self, method, amount=10):
         """
         Test payment functionality
         Returns: (success, message)
@@ -334,7 +317,7 @@ class PaymentSystem:
         # Use test number
         test_number = "01700000000"  # Test number
         
-        success, message, trans_id = self.send_payment(
+        success, message, trans_id = await self.send_payment(
             amount, test_number, method, "TEST_PAYMENT"
         )
         
@@ -419,7 +402,7 @@ class AutoPaymentHandler:
                 # Process payment
                 logging.info(f"Processing withdrawal #{wid}: {amount} TK via {method} to {number}")
                 
-                success, message, transaction_id = payment_system.send_payment(
+                success, message, transaction_id = await payment_system.send_payment(
                     amount, number, method, f"WID{wid}"
                 )
                 
@@ -2173,7 +2156,7 @@ async def test_payment_method(call: types.CallbackQuery):
     
     method = call.data.replace("test_", "")
     
-    success, message = payment_system.test_payment(method)
+    success, message = await payment_system.test_payment(method)
     
     await call.answer(message, show_alert=True)
     await PaymentAdmin.show_payment_dashboard(call)
