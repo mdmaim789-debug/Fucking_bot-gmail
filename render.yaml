@@ -11,7 +11,5 @@ services:
         value: "[6375918223]"
       - key: PORT
         value: 10000
-      - key: AUTO_PAYMENT_ENABLED
-        value: "True"
       - key: FAKE_USER_ENABLED
         value: "True"
