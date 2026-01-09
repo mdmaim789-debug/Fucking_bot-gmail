@@ -1,7 +1,4 @@
 aiogram==2.25.1
-python-telegram-bot==13.15  # aiogram এর সাথে compatible version
 requests==2.31.0
-python-dotenv==1.0.0
-pillow==10.1.0
 apscheduler==3.10.4
-pytz==2023.3
+python-dotenv==1.0.0
