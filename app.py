@@ -24,7 +24,7 @@ import threading
 # ==========================================
 # CONFIGURATION
 # ==========================================
-API_TOKEN = os.getenv('API_TOKEN', 'YOUR_BOT_TOKEN_HERE')
+API_TOKEN = os.getenv('API_TOKEN', '8492580532:AAF-h9q-344C3dYuV15cVzsaVF_WUWU4DZo')
 
 # Parse ADMIN_IDS from environment
 admin_ids_str = os.getenv('ADMIN_IDS', '[6375918223]')
