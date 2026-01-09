@@ -17,9 +17,8 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.utils import executor
 
-# Flask imports for webhook
+# Flask imports
 from flask import Flask, request
-import threading
 
 # ==========================================
 # CONFIGURATION
@@ -27,18 +26,12 @@ import threading
 API_TOKEN = os.getenv('API_TOKEN', '8492580532:AAF-h9q-344C3dYuV15cVzsaVF_WUWU4DZo')
 
 # Parse ADMIN_IDS from environment
-admin_ids_str = os.getenv('ADMIN_IDS', '[6375918223]')
 try:
-    ADMIN_IDS = json.loads(admin_ids_str)
+    ADMIN_IDS = json.loads(os.getenv('ADMIN_IDS', '[6375918223, ]'))
 except:
-    ADMIN_IDS = [6375918223]
+    ADMIN_IDS = [6375918223, 6337650436]
 
-PAYOUT_CHANNEL_ID = -1003676517448
 LOG_CHANNEL_ID = -1003676517448
-
-# Payment System Settings
-AUTO_PAYMENT_ENABLED = os.getenv('AUTO_PAYMENT_ENABLED', 'True') == 'True'
-AUTO_PAY_CHECK_INTERVAL = int(os.getenv('AUTO_PAY_CHECK_INTERVAL', '60'))
 
 # Rates
 DEFAULT_EARN_REFERRAL = 5.0
@@ -55,7 +48,7 @@ MIN_FAKE_USERS = int(os.getenv('MIN_FAKE_USERS', '100'))
 MAX_FAKE_USERS = int(os.getenv('MAX_FAKE_USERS', '500'))
 FAKE_USER_ID_START = 9000000000
 
-# Logging Setup
+# Logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -74,97 +67,6 @@ def home():
 @app.route('/health')
 def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
-
-# ==========================================
-# PAYMENT SYSTEM
-# ==========================================
-class PaymentSystem:
-    def __init__(self):
-        self.bkash_api_key = None
-        self.bkash_api_secret = None
-        self.nagad_api_key = None
-        self.nagad_api_secret = None
-        self.rocket_api_key = None
-        self.auto_payment_enabled = False
-        
-    def setup_payment_apis(self, bkash_key=None, bkash_secret=None, 
-                          nagad_key=None, nagad_secret=None, 
-                          rocket_key=None):
-        """Setup payment API credentials"""
-        self.bkash_api_key = bkash_key
-        self.bkash_api_secret = bkash_secret
-        self.nagad_api_key = nagad_key
-        self.nagad_api_secret = nagad_secret
-        self.rocket_api_key = rocket_key
-        
-        if any([bkash_key, nagad_key, rocket_key]):
-            self.auto_payment_enabled = True
-            logging.info("✅ Auto Payment System ENABLED")
-        else:
-            logging.info("⚠️ Auto Payment DISABLED - Manual mode active")
-            
-        return self.auto_payment_enabled
-    
-    def get_system_status(self):
-        """Get payment system status"""
-        status = {
-            "auto_payment_enabled": self.auto_payment_enabled,
-            "bkash_configured": bool(self.bkash_api_key),
-            "nagad_configured": bool(self.nagad_api_key),
-            "rocket_configured": bool(self.rocket_api_key),
-            "total_methods_available": sum([bool(self.bkash_api_key), 
-                                           bool(self.nagad_api_key), 
-                                           bool(self.rocket_api_key)])
-        }
-        return status
-    
-    async def send_payment(self, amount, recipient_number, method, reference=""):
-        """Send payment"""
-        method = method.lower()
-        
-        if method == "bkash" and self.bkash_api_key:
-            return await self.send_payment_bkash(amount, recipient_number, reference)
-        elif method == "nagad" and self.nagad_api_key:
-            return await self.send_payment_nagad(amount, recipient_number, reference)
-        elif method == "rocket" and self.rocket_api_key:
-            return await self.send_payment_rocket(amount, recipient_number, reference)
-        else:
-            return False, "❌ Invalid payment method", None
-    
-    async def send_payment_bkash(self, amount, recipient_number, reference=""):
-        """Send payment via Bkash"""
-        transaction_id = f"BKASH{int(time.time())}{random.randint(1000, 9999)}"
-        logging.info(f"📱 Bkash Payment: {amount} TK to {recipient_number}")
-        await asyncio.sleep(1)
-        
-        if random.random() < 0.9:
-            return True, "✅ Payment sent successfully", transaction_id
-        else:
-            return False, "❌ Payment failed", None
-    
-    async def send_payment_nagad(self, amount, recipient_number, reference=""):
-        """Send payment via Nagad"""
-        transaction_id = f"NAGAD{int(time.time())}{random.randint(1000, 9999)}"
-        logging.info(f"📱 Nagad Payment: {amount} TK to {recipient_number}")
-        await asyncio.sleep(1)
-        
-        if random.random() < 0.9:
-            return True, "✅ Payment sent successfully", transaction_id
-        else:
-            return False, "❌ Payment failed", None
-    
-    async def send_payment_rocket(self, amount, recipient_number, reference=""):
-        """Send payment via Rocket"""
-        transaction_id = f"ROCKET{int(time.time())}{random.randint(1000, 9999)}"
-        logging.info(f"📱 Rocket Payment: {amount} TK to {recipient_number}")
-        await asyncio.sleep(1)
-        
-        if random.random() < 0.9:
-            return True, "✅ Payment sent successfully", transaction_id
-        else:
-            return False, "❌ Payment failed", None
-
-payment_system = PaymentSystem()
 
 # ==========================================
 # DATABASE SETUP
@@ -233,7 +135,6 @@ def init_db():
         processed_time TEXT,
         transaction_id TEXT,
         api_response TEXT,
-        auto_payment INTEGER DEFAULT 0,
         retry_count INTEGER DEFAULT 0,
         last_retry_time TEXT
     )''')
@@ -263,8 +164,7 @@ def init_db():
         'vip_min_withdraw': str(DEFAULT_VIP_MIN_WITHDRAW),
         'withdrawals_enabled': '1',
         'notice': 'Welcome to Gmail Buy Sell! Start Earning today.',
-        'earn_mail_sell': str(DEFAULT_EARN_MAIL_SELL),
-        'auto_payment_enabled': '1' if AUTO_PAYMENT_ENABLED else '0'
+        'earn_mail_sell': str(DEFAULT_EARN_MAIL_SELL)
     }
     
     for k, v in defaults.items():
@@ -281,147 +181,6 @@ init_db()
 bot = Bot(token=API_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
-
-# ==========================================
-# FAKE USER SYSTEM
-# ==========================================
-def initialize_fake_users():
-    """ফেক ইউজার তৈরি করুন"""
-    if not FAKE_USER_ENABLED:
-        return
-    
-    conn = get_db_connection()
-    c = conn.cursor()
-    
-    c.execute("SELECT COUNT(*) FROM users WHERE user_id >= ?", (FAKE_USER_ID_START,))
-    fake_count = c.fetchone()[0]
-    
-    c.execute("SELECT COUNT(*) FROM users WHERE user_id < ?", (FAKE_USER_ID_START,))
-    real_count = c.fetchone()[0]
-    
-    target_fake = max(MIN_FAKE_USERS, int(real_count * FAKE_USER_RATIO))
-    target_fake = min(target_fake, MAX_FAKE_USERS)
-    
-    if fake_count < target_fake:
-        to_add = target_fake - fake_count
-        logging.info(f"🤖 Adding {to_add} fake users...")
-        
-        added = 0
-        for i in range(to_add):
-            try:
-                fake_id = FAKE_USER_ID_START + random.randint(100000, 9999999)
-                
-                c.execute("SELECT user_id FROM users WHERE user_id=?", (fake_id,))
-                if c.fetchone():
-                    continue
-                
-                fake_name = random.choice(["Rahim", "Karim", "Sakib", "Mim", "Joya", "Rifat", "Tania", "Fahim"])
-                fake_number = random.randint(100, 9999)
-                username = f"{fake_name.lower()}{fake_number}"
-                
-                balance = round(random.uniform(50, 2000), 2)
-                verified = random.randint(1, 15)
-                referrals = random.randint(0, 8)
-                
-                days_ago = random.randint(1, 60)
-                join_date = (datetime.now() - timedelta(days=days_ago)).strftime("%Y-%m-%d %H:%M:%S")
-                
-                hours_ago = random.randint(0, 48)
-                last_active = (datetime.now() - timedelta(hours=hours_ago)).strftime("%Y-%m-%d %H:%M:%S")
-                
-                c.execute('''INSERT INTO users 
-                    (user_id, username, status, account_index, balance, referral_count, 
-                     join_date, last_bonus_time, is_vip) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                    (fake_id, username, 'verified', verified, balance, referrals, 
-                     join_date, last_active, 1 if balance > 1000 else 0))
-                
-                added += 1
-                
-            except Exception as e:
-                logging.error(f"Error adding fake user: {e}")
-                continue
-        
-        conn.commit()
-        logging.info(f"✅ Added {added} fake users. Total fake: {fake_count + added}")
-    
-    conn.close()
-
-async def update_fake_activity():
-    """Update fake user activity"""
-    while True:
-        try:
-            if not FAKE_USER_ENABLED:
-                await asyncio.sleep(3600)
-                continue
-            
-            conn = get_db_connection()
-            c = conn.cursor()
-            
-            c.execute("SELECT user_id, balance FROM users WHERE user_id >= ? ORDER BY RANDOM() LIMIT 20", 
-                     (FAKE_USER_ID_START,))
-            fake_users = c.fetchall()
-            
-            for user_id, current_balance in fake_users:
-                if random.random() > 0.6:
-                    earn_amount = round(random.uniform(5, 50), 2)
-                    c.execute("UPDATE users SET balance=balance+? WHERE user_id=?", 
-                             (earn_amount, user_id))
-                
-                if random.random() > 0.7:
-                    hours_ago = random.randint(0, 12)
-                    recent_time = (datetime.now() - timedelta(hours=hours_ago)).strftime("%Y-%m-%d %H:%M:%S")
-                    c.execute("UPDATE users SET last_bonus_time=? WHERE user_id=?", 
-                             (recent_time, user_id))
-                
-                if random.random() > 0.9:
-                    c.execute("UPDATE users SET referral_count=referral_count+1 WHERE user_id=?", 
-                             (user_id,))
-            
-            conn.commit()
-            conn.close()
-            
-            logging.info("🔄 Updated fake user activity")
-            
-        except Exception as e:
-            logging.error(f"Error updating fake activity: {e}")
-        
-        await asyncio.sleep(4 * 3600)
-
-# ==========================================
-# STATES
-# ==========================================
-class RegisterState(StatesGroup):
-    waiting_for_screenshot = State()
-    
-class WithdrawState(StatesGroup):
-    waiting_for_method = State()
-    waiting_for_number = State()
-    waiting_for_amount = State()
-
-class AdminSettings(StatesGroup):
-    waiting_for_value = State()
-
-class AdminBroadcast(StatesGroup):
-    waiting_for_message = State()
-
-class AdminBanSystem(StatesGroup):
-    waiting_for_id = State()
-
-class AdminNotice(StatesGroup):
-    waiting_for_text = State()
-
-class SupportState(StatesGroup):
-    waiting_for_message = State()
-
-class PaymentSetupState(StatesGroup):
-    waiting_for_api_credentials = State()
-
-class MailSellState(StatesGroup):
-    waiting_for_gmail = State()
-    waiting_for_password = State()
-    waiting_for_recovery = State()
-    verifying_credentials = State()
 
 # ==========================================
 # HELPER FUNCTIONS
@@ -480,7 +239,6 @@ def is_user_in_top10(user_id):
 async def verify_gmail_login(email, password):
     try:
         server = imaplib.IMAP4_SSL("imap.gmail.com", timeout=10)
-        await asyncio.sleep(1)
         server.login(email, password)
         server.logout()
         return True, "Login Successful"
@@ -491,9 +249,129 @@ async def verify_gmail_login(email, password):
         elif "Application-specific password" in err_msg:
             return True, "Verified (2FA Alert)" 
         else:
-            return False, f"⚠️ Google Security Block (Try again later): {err_msg}"
+            return False, f"⚠️ Google Security Block: {err_msg}"
     except Exception as e:
         return False, f"⚠️ Connection Error: {str(e)}"
+
+# ==========================================
+# FAKE USER SYSTEM
+# ==========================================
+def initialize_fake_users():
+    if not FAKE_USER_ENABLED:
+        return
+    
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    c.execute("SELECT COUNT(*) FROM users WHERE user_id >= ?", (FAKE_USER_ID_START,))
+    fake_count = c.fetchone()[0]
+    
+    c.execute("SELECT COUNT(*) FROM users WHERE user_id < ?", (FAKE_USER_ID_START,))
+    real_count = c.fetchone()[0]
+    
+    target_fake = max(MIN_FAKE_USERS, int(real_count * FAKE_USER_RATIO))
+    target_fake = min(target_fake, MAX_FAKE_USERS)
+    
+    if fake_count < target_fake:
+        to_add = target_fake - fake_count
+        print(f"🤖 Adding {to_add} fake users...")
+        
+        for i in range(to_add):
+            try:
+                fake_id = FAKE_USER_ID_START + random.randint(100000, 9999999)
+                
+                c.execute("SELECT user_id FROM users WHERE user_id=?", (fake_id,))
+                if c.fetchone():
+                    continue
+                
+                fake_name = random.choice(["Rahim", "Karim", "Sakib", "Mim", "Joya", "Rifat", "Tania", "Fahim"])
+                fake_number = random.randint(100, 9999)
+                username = f"{fake_name.lower()}{fake_number}"
+                
+                balance = round(random.uniform(50, 2000), 2)
+                verified = random.randint(1, 15)
+                referrals = random.randint(0, 8)
+                
+                days_ago = random.randint(1, 60)
+                join_date = (datetime.now() - timedelta(days=days_ago)).strftime("%Y-%m-%d %H:%M:%S")
+                
+                hours_ago = random.randint(0, 48)
+                last_active = (datetime.now() - timedelta(hours=hours_ago)).strftime("%Y-%m-%d %H:%M:%S")
+                
+                c.execute('''INSERT INTO users 
+                    (user_id, username, status, account_index, balance, referral_count, 
+                     join_date, last_bonus_time, is_vip) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                    (fake_id, username, 'verified', verified, balance, referrals, 
+                     join_date, last_active, 1 if balance > 1000 else 0))
+                
+            except Exception as e:
+                print(f"Error adding fake user: {e}")
+                continue
+        
+        conn.commit()
+        print(f"✅ Added fake users. Total fake: {c.rowcount}")
+    
+    conn.close()
+
+async def get_smart_stats():
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    c.execute("SELECT COUNT(*) FROM users WHERE user_id < ? AND banned=0", (FAKE_USER_ID_START,))
+    real_users = c.fetchone()[0] or 0
+    
+    c.execute("SELECT COUNT(*) FROM users WHERE user_id >= ?", (FAKE_USER_ID_START,))
+    fake_users = c.fetchone()[0] or 0
+    
+    total_shown = real_users + fake_users
+    
+    if real_users > 10:
+        growth_rate = random.randint(3, 10)
+    else:
+        growth_rate = random.randint(15, 30)
+    
+    conn.close()
+    
+    return {
+        'total_users': total_shown,
+        'active_today': random.randint(int(total_shown * 0.1), int(total_shown * 0.3)),
+        'real_users': real_users,
+        'fake_users': fake_users,
+        'growth_rate': growth_rate
+    }
+
+# ==========================================
+# STATES
+# ==========================================
+class RegisterState(StatesGroup):
+    waiting_for_screenshot = State()
+    
+class WithdrawState(StatesGroup):
+    waiting_for_method = State()
+    waiting_for_number = State()
+    waiting_for_amount = State()
+
+class AdminSettings(StatesGroup):
+    waiting_for_value = State()
+
+class AdminBroadcast(StatesGroup):
+    waiting_for_message = State()
+
+class AdminBanSystem(StatesGroup):
+    waiting_for_id = State()
+
+class AdminNotice(StatesGroup):
+    waiting_for_text = State()
+
+class SupportState(StatesGroup):
+    waiting_for_message = State()
+
+class MailSellState(StatesGroup):
+    waiting_for_gmail = State()
+    waiting_for_password = State()
+    waiting_for_recovery = State()
+    verifying_credentials = State()
 
 # ==========================================
 # COMMAND HANDLERS
@@ -543,6 +421,7 @@ async def cmd_start(message: types.Message):
                 await bot.send_message(referrer, f"🎉 **New Referral!**\n+{ref_rate} TK earned!\nTotal Referred: Check 'My Referral'")
             except:
                 pass
+    
     conn.close()
     
     kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
@@ -591,7 +470,7 @@ async def mail_sell_start(message: types.Message, state: FSMContext):
     
     await MailSellState.waiting_for_gmail.set()
     await message.answer(
-        "📧 **Mail Sell System (Auto-Verified)**\n\n"
+        "📧 **Mail Sell System**\n\n"
         "Enter Gmail address:\n"
         "Example: `maim1234@gmail.com` or just `maim1234`\n\n"
         "⚠️ **IMPORTANT:** Only submit REAL working Gmails!",
@@ -619,8 +498,8 @@ async def process_gmail_address(message: types.Message, state: FSMContext):
     await message.answer(
         "🔑 **Enter Password:**\n"
         "Enter the EXACT password for this Gmail.\n\n"
-        "⚠️ **BOT WILL AUTO-VERIFY!**\n"
-        "Fake credentials will be rejected automatically.",
+        "⚠️ **BOT WILL VERIFY!**\n"
+        "Fake credentials will be rejected.",
         parse_mode="Markdown"
     )
 
@@ -654,8 +533,7 @@ async def process_gmail_password(message: types.Message, state: FSMContext):
             f"❌ **VERIFICATION FAILED!**\n\n"
             f"📧 `{gmail_address}`\n\n"
             f"**Reason:** {msg}\n\n"
-            f"⚠️ **Warning:** Fake/wrong credentials detected!\n"
-            f"Submit REAL working Gmails only."
+            f"⚠️ **Warning:** Fake/wrong credentials detected!"
         )
         await state.finish()
         return
@@ -668,10 +546,6 @@ async def process_gmail_password(message: types.Message, state: FSMContext):
     )
     
     await MailSellState.waiting_for_recovery.set()
-
-@dp.message_handler(state=MailSellState.verifying_credentials)
-async def handle_verification_state(message: types.Message):
-    await message.answer("⏳ Please wait, verification in progress...")
 
 @dp.message_handler(state=MailSellState.waiting_for_recovery)
 async def process_recovery_email(message: types.Message, state: FSMContext):
@@ -730,7 +604,7 @@ async def process_recovery_email(message: types.Message, state: FSMContext):
                 f"🔑 **Password:** `{password}`\n"
                 f"📩 **Recovery:** `{recovery_email or 'None'}`\n"
                 f"💰 **Paid:** {mail_sell_rate} TK\n"
-                f"✅ **Status:** Auto-approved (Bot verified)"
+                f"✅ **Status:** Auto-approved"
             )
             
             await bot.send_message(admin_id, admin_msg, parse_mode="Markdown")
@@ -830,11 +704,9 @@ async def help_menu(message: types.Message):
 
 💰 **Minimum Withdraw:** 100 TK
 📧 **Mail Sell:** Submit your verified Gmails for extra income
-━━━━━━━━━━━━━━━━━━━━
+
 🤖 **Bot Created By:** XTﾠMꫝɪᴍﾠ!!
-📞 **Contact:** [Click Here](https://t.me/cr_maim)
-📧 **Email:** `immaim55@gmail.com`
-━━━━━━━━━━━━━━━━━━━━
+📞 **Contact:** @cr_maim
 """
     await message.answer(help_text, parse_mode="Markdown")
 
@@ -918,16 +790,11 @@ async def smart_leaderboard(message: types.Message):
     
     for idx, (name, bal, refs, is_fake) in enumerate(rows[:15], 1):
         medal = "🥇" if idx==1 else ("🥈" if idx==2 else ("🥉" if idx==3 else f"{idx}."))
-        verified_badge = " ✅" if is_fake and idx <= 5 else ""
         display_name = (name or f"User{idx}")[:12]
-        msg += f"{medal} **{display_name}**{verified_badge} - ৳{bal:,.0f} ({refs} refs)\n"
+        msg += f"{medal} **{display_name}** - ৳{bal:,.0f} ({refs} refs)\n"
         
         if idx == 1:
             msg += "   ⭐ **TOP EARNER OF THE MONTH** ⭐\n"
-        elif idx == 2:
-            msg += "   🥈 **ELITE FARMER**\n"
-        elif idx == 3:
-            msg += "   🥉 **PRO VERIFIER**\n"
     
     total_ranked = len(rows)
     msg += f"\n📊 **Total Ranked:** {total_ranked:,} users"
@@ -1133,13 +1000,9 @@ async def withdraw_start(message: types.Message):
         await message.answer(f"❌ **Low Balance**\n💰 Need: {min_w} TK\n💳 Current: {user[4]:.2f} TK")
         return
     
-    status = payment_system.get_system_status()
-    payment_mode = "🔄 **AUTO** (Instant)" if status["auto_payment_enabled"] else "👨‍💼 **MANUAL** (24h)"
-    
     msg = (f"💳 **Withdraw Funds**\n\n"
            f"💰 **Balance:** {user[4]:.2f} TK\n"
-           f"📱 **Payment Mode:** {payment_mode}\n"
-           f"⏱️ **Processing:** {'5 minutes' if status['auto_payment_enabled'] else '24 hours'}\n\n"
+           f"⏱️ **Processing:** 24 hours\n\n"
            f"💡 **Minimum:** {min_w} TK")
     
     kb = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True, row_width=2)
@@ -1158,20 +1021,6 @@ async def withdraw_method(message: types.Message, state: FSMContext):
         kb.add("🔙 Main Menu")
         await message.answer("Cancelled.", reply_markup=kb)
         return
-    
-    method = message.text.lower()
-    status = payment_system.get_system_status()
-    
-    if status["auto_payment_enabled"]:
-        if method == "bkash" and not status["bkash_configured"]:
-            await message.answer("⚠️ Bkash auto payment not configured. Please select another method.")
-            return
-        elif method == "nagad" and not status["nagad_configured"]:
-            await message.answer("⚠️ Nagad auto payment not configured. Please select another method.")
-            return
-        elif method == "rocket" and not status["rocket_configured"]:
-            await message.answer("⚠️ Rocket auto payment not configured. Please select another method.")
-            return
     
     await state.update_data(method=message.text)
     await WithdrawState.waiting_for_number.set()
@@ -1195,29 +1044,20 @@ async def withdraw_amount(message: types.Message, state: FSMContext):
         
         data = await state.get_data()
         
-        # Process withdrawal
-        if payment_system.auto_payment_enabled:
-            mode = "auto"
-            message_text = "✅ Withdrawal submitted for auto processing!\n⏳ Payment will be sent within 5 minutes."
-        else:
-            mode = "manual"
-            message_text = "✅ Request Submitted!\n⏳ Processing within 24h."
-        
-        # Save to database
+        # Save withdrawal request
         conn = get_db_connection()
         c = conn.cursor()
         c.execute("""
             INSERT INTO withdrawals 
-            (user_id, amount, payment_method, mobile_number, status, request_time, auto_payment) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (user_id, amount, payment_method, mobile_number, status, request_time) 
+            VALUES (?, ?, ?, ?, ?, ?)
         """, (
             message.from_user.id, 
             amount, 
             data['method'], 
             data['number'], 
-            'pending', 
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            1 if mode == "auto" else 0
+            'pending',
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ))
         conn.commit()
         conn.close()
@@ -1229,8 +1069,18 @@ async def withdraw_amount(message: types.Message, state: FSMContext):
         kb.add("💸 Withdraw", "4️⃣ My Referral")
         kb.add("🔙 Main Menu")
         
-        await message.answer(message_text, reply_markup=kb, parse_mode="Markdown")
+        await message.answer("✅ **Withdrawal Request Submitted!**\n⏳ Processing within 24 hours.", reply_markup=kb, parse_mode="Markdown")
         
+        # Notify admins
+        for admin_id in ADMIN_IDS:
+            try:
+                await bot.send_message(admin_id, 
+                    f"💸 **New Withdrawal**\n"
+                    f"👤 `{message.from_user.id}`\n"
+                    f"💰 `{amount}` {data['method']}\n"
+                    f"📱 `{data['number']}`")
+            except: pass
+            
     except ValueError:
         await message.answer("❌ **Invalid Amount**")
     except Exception as e:
@@ -1242,9 +1092,6 @@ async def withdraw_amount(message: types.Message, state: FSMContext):
 @dp.message_handler(commands=['admin'], state="*")
 async def admin_panel(message: types.Message):
     if message.from_user.id not in ADMIN_IDS: return
-    
-    status = payment_system.get_system_status()
-    payment_mode = "🔄 AUTO" if status["auto_payment_enabled"] else "👨‍💼 MANUAL"
     
     kb = InlineKeyboardMarkup(row_width=2)
     kb.add(InlineKeyboardButton("📥 Manual Reviews", callback_data="admin_verifications"),
@@ -1258,23 +1105,132 @@ async def admin_panel(message: types.Message):
     kb.add(InlineKeyboardButton("✏️ Notice", callback_data="admin_set_notice"),
            InlineKeyboardButton("📧 Mail Sales", callback_data="admin_mail_sales"))
     kb.add(InlineKeyboardButton("🤖 Fake System", callback_data="fake_system_control"))
-    kb.add(InlineKeyboardButton(f"💳 Payment: {payment_mode}", callback_data="payment_dashboard"))
     
-    await message.answer(f"👮‍♂️ **Admin Control Panel**\n💳 **Payment Mode:** {payment_mode}", reply_markup=kb, parse_mode="Markdown")
+    await message.answer("👮‍♂️ **Admin Control Panel**", reply_markup=kb, parse_mode="Markdown")
 
-# Add other admin handlers as needed...
+@dp.callback_query_handler(lambda c: c.data == "admin_stats", state="*")
+async def admin_stats(call: types.CallbackQuery):
+    if call.from_user.id not in ADMIN_IDS: return
+    
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    # User stats
+    c.execute("SELECT COUNT(*), SUM(balance), SUM(referral_count) FROM users")
+    res = c.fetchone()
+    total_users, total_balance, total_refs = res if res else (0, 0, 0)
+    
+    c.execute("SELECT COUNT(*) FROM users WHERE status='verified'")
+    res_ver = c.fetchone()
+    verified = res_ver[0] if res_ver else 0
+    
+    # Fake user stats
+    c.execute("SELECT COUNT(*) FROM users WHERE user_id >= ?", (FAKE_USER_ID_START,))
+    fake_count = c.fetchone()[0] or 0
+    
+    c.execute("SELECT COUNT(*) FROM users WHERE user_id < ?", (FAKE_USER_ID_START,))
+    real_count = c.fetchone()[0] or 0
+    
+    # Mail sales stats
+    c.execute("SELECT COUNT(*), SUM(amount) FROM sold_mails WHERE status='verified'")
+    mail_stats = c.fetchone()
+    mail_sales = mail_stats[0] if mail_stats[0] else 0
+    mail_earnings = mail_stats[1] if mail_stats[1] else 0
+    
+    # Withdrawal stats
+    c.execute("SELECT COUNT(*), SUM(amount) FROM withdrawals WHERE status='paid'")
+    withdrawal_stats = c.fetchone()
+    total_withdrawals = withdrawal_stats[0] or 0
+    total_paid = withdrawal_stats[1] or 0
+    
+    conn.close()
+    
+    stats = (f"📈 **Stats**\n"
+             f"👥 Real Users: {real_count}\n"
+             f"👻 Fake Users: {fake_count}\n"
+             f"📊 Total Shown: {real_count + fake_count}\n"
+             f"💰 Total Balance: {total_balance or 0:.2f} TK\n"
+             f"✅ Verified Accounts: {verified}\n"
+             f"🔗 Referrals: {total_refs or 0}\n"
+             f"📧 Auto-Verified Mails: {mail_sales}\n"
+             f"💵 Mail Sales Earnings: {mail_earnings:.2f} TK\n"
+             f"💸 Total Withdrawals: {total_withdrawals}\n"
+             f"💰 Total Paid Out: {total_paid:.2f} TK")
+    
+    kb = InlineKeyboardMarkup().add(InlineKeyboardButton("🔙 Back", callback_data="admin_home"))
+    await call.message.edit_text(stats, reply_markup=kb, parse_mode="Markdown")
+    await call.answer()
+
+@dp.callback_query_handler(lambda c: c.data == "fake_system_control", state="*")
+async def fake_system_control(call: types.CallbackQuery):
+    if call.from_user.id not in ADMIN_IDS: return
+    
+    kb = InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        InlineKeyboardButton("➕ Add Fake Users", callback_data="fake_add_100"),
+        InlineKeyboardButton("📊 View Stats", callback_data="fake_stats")
+    )
+    kb.add(
+        InlineKeyboardButton("❌ Remove All Fake", callback_data="fake_remove_all"),
+        InlineKeyboardButton("🔙 Back", callback_data="admin_home")
+    )
+    
+    stats = await get_smart_stats()
+    
+    control_msg = (
+        f"🤖 **Fake User System Control**\n\n"
+        f"✅ **Status:** {'ENABLED' if FAKE_USER_ENABLED else 'DISABLED'}\n"
+        f"👥 **Real Users:** {stats['real_users']}\n"
+        f"👻 **Fake Users:** {stats['fake_users']}\n"
+        f"📊 **Total Shown:** {stats['total_users']:,}\n"
+        f"📈 **Active Today:** {stats['active_today']:,}\n"
+        f"🎯 **Fake Ratio:** {FAKE_USER_RATIO*100}%"
+    )
+    
+    await call.message.edit_text(control_msg, reply_markup=kb, parse_mode="Markdown")
+    await call.answer()
+
+@dp.callback_query_handler(lambda c: c.data.startswith('fake_'), state="*")
+async def handle_fake_controls(call: types.CallbackQuery):
+    if call.from_user.id not in ADMIN_IDS: return
+    
+    if call.data == "fake_add_100":
+        initialize_fake_users()
+        await call.answer("✅ Fake users added!", show_alert=True)
+        await fake_system_control(call)
+    
+    elif call.data == "fake_stats":
+        stats = await get_smart_stats()
+        stats_msg = (
+            f"📈 **Fake Stats**\n\n"
+            f"👥 Real: {stats['real_users']}\n"
+            f"👻 Fake: {stats['fake_users']}\n"
+            f"📊 Total: {stats['total_users']:,}\n"
+            f"📈 Active: {stats['active_today']:,}\n"
+            f"🚀 Growth: +{stats['growth_rate']}%"
+        )
+        await call.message.edit_text(stats_msg, parse_mode="Markdown")
+    
+    elif call.data == "fake_remove_all":
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("DELETE FROM users WHERE user_id >= ?", (FAKE_USER_ID_START,))
+        deleted = c.rowcount
+        conn.commit()
+        conn.close()
+        await call.answer(f"✅ Removed {deleted} fake users!", show_alert=True)
+        await fake_system_control(call)
 
 # ==========================================
 # STARTUP FUNCTION
 # ==========================================
 async def on_startup(dp):
     """Initialize systems on bot start"""
-    print("🚀 Starting Smart Systems...")
+    print("🚀 Starting Maim Gmail Bot...")
     
     # Initialize fake user system
     if FAKE_USER_ENABLED:
         initialize_fake_users()
-        asyncio.create_task(update_fake_activity())
         print("✅ Fake system initialized")
     else:
         print("❌ Fake system disabled")
@@ -1282,7 +1238,7 @@ async def on_startup(dp):
     print("🤖 Bot is ready!")
 
 # ==========================================
-# MAIN EXECUTION FOR RENDER
+# MAIN EXECUTION
 # ==========================================
 def run_bot():
     """Run the bot in polling mode"""
@@ -1293,6 +1249,8 @@ def run_flask():
     app.run(host='0.0.0.0', port=int(os.getenv('PORT', 10000)))
 
 if __name__ == '__main__':
+    import threading
+    
     print("="*50)
     print("🤖 Maim Gmail Bot Starting...")
     print("🌐 Render Mode: YES")
