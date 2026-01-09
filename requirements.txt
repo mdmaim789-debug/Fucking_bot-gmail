@@ -1,6 +1,2 @@
 aiogram==2.25.1
 Flask==2.3.3
-SQLAlchemy==2.0.19
-python-dotenv==1.0.0
-requests==2.31.0
-aiohttp==3.8.5
